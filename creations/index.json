@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "slug": "bouncing-balls",
+    "title": "Kinetic Sandbox",
+    "prompt": "a bouncing-ball physics playground with gravity, friction and bounce sliders",
+    "createdAt": "2026-09-19T15:26:31.119Z",
+    "model": "Perchance AI",
+    "chars": 3285
+  }
+]
