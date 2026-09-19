@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moderation Console</title>
+<meta name="description" content="Block, bulk block and randomly block accounts from a directory.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23f87171' stroke-width='3'/%3E%3Cpath d='M10 16h12' stroke='%23f87171' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; text-align: left; color: #e6ebf5;
+  font: 14.5px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background:
+    radial-gradient(1000px 500px at 8% -10%, rgba(248, 113, 113, .13), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(124, 92, 255, .13), transparent 58%),
+    #0b0e14;
+  background-attachment: fixed;
+}
+h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -.02em; }
+p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid #7c5cff; outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.top {
+  max-width: 1400px; margin: 0 auto; padding: 20px 20px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 13px; }
+.mark {
+  width: 42px; height: 42px; border-radius: 12px; flex: none; display: grid; place-items: center;
+  background: linear-gradient(150deg, #f87171, #b91c1c); font-size: 19px;
+  box-shadow: 0 6px 22px rgba(248, 113, 113, .3);
+}
+h1 { font-size: 20px; font-weight: 700; }
+.sub { font-size: 12.5px; color: #8b97ad; }
+
+.stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.stat { background: #121722; border: 1px solid #1f2738; border-radius: 12px; padding: 8px 14px; min-width: 84px; }
+.stat b { display: block; font-size: 19px; line-height: 1.2; }
+.stat span { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #74809a; }
+.stat.blocked b { color: #fca5a5; }
+.stat.active b { color: #6ee7b7; }
+
+main {
+  max-width: 1400px; margin: 0 auto; padding: 0 20px 44px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; align-items: start;
+}
+.panel {
+  background: linear-gradient(180deg, rgba(23, 29, 42, .93), rgba(15, 19, 28, .93));
+  border: 1px solid #1f2738; border-radius: 16px; padding: 14px;
+  box-shadow: 0 20px 50px -30px rgba(0, 0, 0, .9);
+}
+.panel + .panel { margin-top: 16px; }
+.panel h2 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+
+.btn {
+  background: #1d2534; border: 1px solid #33415a; color: #e6ebf5;
+  padding: 9px 14px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer;
+  transition: .15s ease; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: #253044; }
+.btn:disabled { opacity: .42; cursor: not-allowed; }
+.btn.danger { background: linear-gradient(150deg, #ef4444, #b91c1c); border: 0; color: #fff; box-shadow: 0 5px 18px rgba(239, 68, 68, .28); }
+.btn.danger:hover:not(:disabled) { filter: brightness(1.1); }
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
+
+.tools { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+input[type="text"], input[type="number"], input[type="search"] {
+  background: #0e131c; border: 1px solid #232c3d; border-radius: 10px; padding: 9px 11px; transition: .15s ease;
+}
+input:focus { outline: none; border-color: #5b6cff; box-shadow: 0 0 0 3px rgba(92, 108, 255, .18); }
+#search { flex: 1; min-width: 160px; }
+.toggle { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: #cbd5e6; cursor: pointer; user-select: none; }
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: #7c5cff; cursor: pointer; }
+
+.bulk {
+  display: flex; gap: 9px; align-items: center; flex-wrap: wrap;
+  background: #241722; border: 1px solid #4c1d24; border-radius: 11px; padding: 9px 11px; margin-bottom: 12px;
+}
+.bulk span { font-size: 13px; color: #fca5a5; font-weight: 600; }
+
+.listhead, .row {
+  display: grid; grid-template-columns: 30px minmax(0, 1.7fr) 88px 88px 92px 104px;
+  gap: 10px; align-items: center;
+}
+.listhead {
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #74809a;
+  padding: 0 10px 8px; border-bottom: 1px solid #1f2738; margin-bottom: 6px;
+}
+.list { max-height: 62vh; overflow: auto; }
+.row { padding: 9px 10px; border-radius: 11px; border: 1px solid transparent; }
+.row:hover { background: #141b28; }
+.row.sel { background: #1a2130; border-color: #33415a; }
+.row.is-blocked { opacity: .68; }
+.who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  font-weight: 700; font-size: 12.5px; color: #0b0e14;
+}
+.who .txt { min-width: 0; }
+.who .n { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who .h { font-size: 12px; color: #74809a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell { font-size: 12.5px; color: #9fb0c9; }
+.pill { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; display: inline-block; }
+.pill.ok { background: #10281f; color: #6ee7b7; }
+.pill.bad { background: #2a1216; color: #fca5a5; }
+.empty { padding: 30px; text-align: center; color: #74809a; font-size: 13px; }
+
+.danger-panel { border-color: #4c1d24; }
+.danger-panel h2 { color: #fca5a5; }
+.hint { font-size: 12.5px; color: #8b97ad; margin-bottom: 11px; }
+.row2 { display: flex; gap: 9px; }
+#randCount { width: 88px; }
+.warn {
+  border: 1px solid #5a3a12; background: #1d1508; color: #fcd34d; border-radius: 11px;
+  padding: 10px 11px; font-size: 12.5px; line-height: 1.5; margin-top: 11px;
+}
+.warn b { color: #fde68a; }
+.quick { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+
+.log { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; display: flex; flex-direction: column; gap: 7px; }
+.log li { font-size: 12.5px; color: #9fb0c9; border-left: 2px solid #2a3448; padding-left: 10px; }
+.log li b { color: #e6ebf5; }
+.log .t { color: #5b667e; font-size: 11px; }
+.log .empty-log { border: 0; color: #5b667e; padding: 0; }
+
+dialog {
+  border: 1px solid #4c1d24; border-radius: 16px; background: #121722; color: #e6ebf5;
+  padding: 0; width: min(460px, 94vw); box-shadow: 0 40px 90px -40px #000;
+}
+dialog::backdrop { background: rgba(4, 6, 10, .76); }
+.dlg-head { padding: 15px 18px 0; }
+.dlg-head h3 { font-size: 16px; color: #fca5a5; }
+.dlg-body { padding: 12px 18px 4px; font-size: 13.5px; line-height: 1.6; color: #cbd5e6; }
+.dlg-foot { padding: 16px 18px; display: flex; justify-content: flex-end; gap: 9px; }
+
+#toasts { position: fixed; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 8px; z-index: 60; max-width: 320px; }
+.toast {
+  background: #161d2b; border: 1px solid #2a3448; border-left: 3px solid #f87171; color: #e6ebf5;
+  padding: 10px 14px; border-radius: 10px; font-size: 13px; box-shadow: 0 16px 40px -20px #000;
+  animation: rise .22s ease;
+}
+.toast.ok { border-left-color: #34d399; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  .listhead { display: none; }
+  .row { grid-template-columns: 30px minmax(0, 1fr); row-gap: 8px; padding: 12px 10px; border-color: #1f2738; }
+  .row .cell, .row .act { grid-column: 2; }
+  .row .cell { display: flex; gap: 6px; }
+  .row .cell::before { content: attr(data-l); color: #5b667e; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">&#9940;</span>
+    <div>
+      <h1>Moderation Console</h1>
+      <p class="sub">Block, bulk block and randomly block accounts &mdash; a working demo toolkit.</p>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<main>
+  <section class="panel" aria-label="Account directory">
+    <div class="tools">
+      <input id="search" type="search" placeholder="Search handle or name" aria-label="Search accounts">
+      <label class="toggle"><input type="checkbox" id="onlyBlocked"> Blocked only</label>
+      <button id="undoBtn" class="btn" type="button" disabled>Undo</button>
+      <button id="resetBtn" class="btn ghost" type="button">Reset seed</button>
+    </div>
+
+    <div class="bulk" id="bulkBar" hidden>
+      <span id="selCount">0 selected</span>
+      <button id="blockSel" class="btn danger sm" type="button">Block selected</button>
+      <button id="unblockSel" class="btn sm" type="button">Unblock selected</button>
+      <button id="clearSel" class="btn ghost sm" type="button">Clear</button>
+    </div>
+
+    <div class="listhead" aria-hidden="true">
+      <label class="chk"><input type="checkbox" id="selectAll" aria-label="Select all visible"></label>
+      <span>Account</span><span>Joined</span><span>Last seen</span><span>Status</span><span></span>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="empty" id="listEmpty" hidden>No accounts match those filters.</div>
+  </section>
+
+  <aside>
+    <section class="panel danger-panel" aria-label="Random block">
+      <h2>Random block</h2>
+      <p class="hint">Picks accounts at random from the currently unblocked set.</p>
+      <div class="row2">
+        <input id="randCount" type="number" min="1" step="1" value="5" aria-label="How many accounts to block">
+        <button id="randBtn" class="btn danger" type="button">Block at random</button>
+      </div>
+      <div class="quick" id="quickCounts"></div>
+      <div class="warn" id="randWarn"></div>
+    </section>
+
+    <section class="panel" aria-label="Activity log">
+      <h2>Activity log</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+  </aside>
+</main>
+
+<div id="toasts" aria-live="polite"></div>
+
+<dialog id="confirmDlg">
+  <div class="dlg-head"><h3 id="cfTitle">Are you sure?</h3></div>
+  <div class="dlg-body" id="cfBody"></div>
+  <div class="dlg-foot">
+    <button id="cfCancel" class="btn" type="button">Cancel</button>
+    <button id="cfOk" class="btn danger" type="button">Confirm</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var LS = "modconsole.v1";
+
+  var FIRST = ["Ada", "Noor", "Kenji", "Lucia", "Tobias", "Priya", "Mateo", "Zara", "Ines", "Dmitri", "Hana", "Oscar", "Freya", "Malik", "Yuki", "Rosa", "Anders", "Leila", "Pablo", "Nina", "Idris", "Sofia", "Jonas", "Amara", "Ravi", "Greta", "Theo", "Mina", "Lars", "Chiara", "Kofi", "Elena", "Hugo", "Sana", "Bruno", "Aisha", "Otto", "Camille", "Ezra", "Nadia"];
+  var LAST = ["Okafor", "Lindqvist", "Moreau", "Tanaka", "Silva", "Novak", "Haddad", "Kowalski", "Bergstrom", "Ferreira", "Adeyemi", "Rossi", "Nakamura", "Dubois", "Ivanov", "Mbeki", "Larsen", "Costa", "Weber", "Kaur", "Nguyen", "Almeida", "Sharma", "Bianchi", "Sorensen", "Yilmaz", "Delgado", "Fischer"];
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function seedUsers() {
+    var rnd = mulberry32(Math.floor(Math.random() * 1e9));
+    var out = [], used = {}, i;
+    for (i = 0; i < 48; i++) {
+      var f = FIRST[Math.floor(rnd() * FIRST.length)];
+      var l = LAST[Math.floor(rnd() * LAST.length)];
+      var handle = (f + l).toLowerCase(), n = 1;
+      while (used[handle]) { handle = (f + l).toLowerCase() + (++n); }
+      used[handle] = 1;
+      out.push({
+        id: "u" + i,
+        name: f + " " + l,
+        handle: "@" + handle,
+        joined: Date.now() - Math.floor(rnd() * 1.1e11) - 2.6e9,
+        lastSeen: Date.now() - Math.floor(rnd() * 3.5e9),
+        blocked: rnd() < 0.06,
+        hue: Math.floor(rnd() * 360)
+      });
+    }
+    return out;
+  }
+
+  var state = {
+    users: [],
+    log: [],
+    history: [],
+    selection: {},
+    seed: 0
+  };
+
+  function save() {
+    try {
+      localStorage.setItem(LS, JSON.stringify({
+        users: state.users, log: state.log.slice(0, 40), seed: state.seed, history: state.history.slice(-8)
+      }));
+    } catch (e) {}
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(LS);
+      if (!raw) return false;
+      var p = JSON.parse(raw);
+      if (!p || !Array.isArray(p.users) || !p.users.length) return false;
+      state.users = p.users;
+      state.log = Array.isArray(p.log) ? p.log : [];
+      state.history = Array.isArray(p.history) ? p.history : [];
+      state.seed = p.seed || 0;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  var rng = mulberry32(Date.now() & 0xffffffff);
+
+  function toast(msg, kind) {
+    var el = document.createElement("div");
+    el.className = "toast" + (kind ? " " + kind : "");
+    el.textContent = msg;
+    $("#toasts").appendChild(el);
+    setTimeout(function () { el.remove(); }, 3600);
+  }
+
+  function initials(name) {
+    return name.split(/\s+/).map(function (w) { return w.charAt(0); }).join("").slice(0, 2).toUpperCase();
+  }
+
+  function timeAgo(ts) {
+    var s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+    if (s < 60) return s + "s ago";
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + "m ago";
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + "h ago";
+    var d = Math.floor(h / 24);
+    if (d < 30) return d + "d ago";
+    var mo = Math.floor(d / 30);
+    if (mo < 12) return mo + "mo ago";
+    return Math.floor(mo / 12) + "y ago";
+  }
+
+  function shortDate(ts) {
+    return new Date(ts).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function pushHistory(label) {
+    state.history.push({ label: label, blocked: state.users.map(function (u) { return u.blocked; }) });
+    if (state.history.length > 30) state.history.shift();
+  }
+
+  function addLog(action, detail) {
+    state.log.unshift({ t: Date.now(), action: action, detail: detail });
+    if (state.log.length > 60) state.log.pop();
+  }
+
+  function visible() {
+    var q = $("#search").value.trim().toLowerCase();
+    var only = $("#onlyBlocked").checked;
+    return state.users.filter(function (u) {
+      if (only && !u.blocked) return false;
+      if (!q) return true;
+      return u.name.toLowerCase().indexOf(q) !== -1 || u.handle.toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  function renderStats() {
+    var total = state.users.length;
+    var blocked = state.users.filter(function (u) { return u.blocked; }).length;
+    var box = $("#stats");
+    box.innerHTML = "";
+    [["Total", total, ""], ["Active", total - blocked, "active"], ["Blocked", blocked, "blocked"]].forEach(function (row) {
+      var d = document.createElement("div");
+      d.className = "stat " + row[2];
+      var b = document.createElement("b");
+      b.textContent = row[1];
+      var s = document.createElement("span");
+      s.textContent = row[0];
+      d.appendChild(b); d.appendChild(s);
+      box.appendChild(d);
+    });
+  }
+
+  function renderList() {
+    var list = $("#list");
+    list.innerHTML = "";
+    var rows = visible();
+    $("#listEmpty").hidden = rows.length > 0;
+
+    rows.forEach(function (u) {
+      var row = document.createElement("div");
+      row.className = "row" + (u.blocked ? " is-blocked" : "") + (state.selection[u.id] ? " sel" : "");
+      row.setAttribute("role", "listitem");
+
+      var chk = document.createElement("label");
+      chk.className = "chk";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!state.selection[u.id];
+      cb.setAttribute("aria-label", "Select " + u.handle);
+      cb.onchange = function () {
+        if (this.checked) state.selection[u.id] = true; else delete state.selection[u.id];
+        updateBulk();
+        row.classList.toggle("sel", this.checked);
+      };
+      chk.appendChild(cb);
+      row.appendChild(chk);
+
+      var who = document.createElement("div");
+      who.className = "who";
+      var av = document.createElement("span");
+      av.className = "avatar";
+      av.style.background = "hsl(" + u.hue + " 72% 62%)";
+      av.textContent = initials(u.name);
+      var txt = document.createElement("div");
+      txt.className = "txt";
+      var n = document.createElement("div");
+      n.className = "n";
+      n.textContent = u.name;
+      var h = document.createElement("div");
+      h.className = "h mono";
+      h.textContent = u.handle;
+      txt.appendChild(n); txt.appendChild(h);
+      who.appendChild(av); who.appendChild(txt);
+      row.appendChild(who);
+
+      var joined = document.createElement("div");
+      joined.className = "cell";
+      joined.setAttribute("data-l", "Joined");
+      joined.textContent = shortDate(u.joined);
+      row.appendChild(joined);
+
+      var seen = document.createElement("div");
+      seen.className = "cell";
+      seen.setAttribute("data-l", "Last seen");
+      seen.textContent = timeAgo(u.lastSeen);
+      row.appendChild(seen);
+
+      var st = document.createElement("div");
+      st.className = "cell";
+      st.setAttribute("data-l", "Status");
+      var pill = document.createElement("span");
+      pill.className = "pill " + (u.blocked ? "bad" : "ok");
+      pill.textContent = u.blocked ? "Blocked" : "Active";
+      st.appendChild(pill);
+      row.appendChild(st);
+
+      var act = document.createElement("div");
+      act.className = "act";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn sm" + (u.blocked ? "" : " danger");
+      btn.textContent = u.blocked ? "Unblock" : "Block";
+      btn.onclick = function () {
+        pushHistory((u.blocked ? "Unblock " : "Block ") + u.handle);
+        u.blocked = !u.blocked;
+        addLog(u.blocked ? "Block" : "Unblock", u.handle + " (" + u.name + ")");
+        save(); render();
+        toast((u.blocked ? "Blocked " : "Unblocked ") + u.handle, u.blocked ? "" : "ok");
+      };
+      act.appendChild(btn);
+      row.appendChild(act);
+
+      list.appendChild(row);
+    });
+  }
+
+  function selIds() {
+    return Object.keys(state.selection).filter(function (k) { return state.selection[k]; });
+  }
+
+  function updateBulk() {
+    var ids = selIds();
+    $("#bulkBar").hidden = ids.length === 0;
+    $("#selCount").textContent = ids.length + " selected";
+    var vis = visible();
+    var visIds = vis.map(function (u) { return u.id; });
+    var allSel = visIds.length > 0 && visIds.every(function (id) { return state.selection[id]; });
+    $("#selectAll").checked = allSel;
+    updateRandWarn();
+  }
+
+  function bulkSet(blocked) {
+    var ids = selIds();
+    if (!ids.length) return;
+    var changed = 0, labels = [];
+    pushHistory((blocked ? "Bulk block x" : "Bulk unblock x") + ids.length);
+    ids.forEach(function (id) {
+      var u = state.users.filter(function (x) { return x.id === id; })[0];
+      if (!u || u.blocked === blocked) return;
+      u.blocked = blocked;
+      changed++;
+      labels.push(u.handle);
+    });
+    addLog(blocked ? "Bulk block" : "Bulk unblock", changed + " accounts: " + labels.slice(0, 3).join(", ") + (labels.length > 3 ? " +" + (labels.length - 3) : ""));
+    state.selection = {};
+    save(); render(); updateBulk();
+    toast((blocked ? "Blocked " : "Unblocked ") + changed + " account" + (changed === 1 ? "" : "s"), blocked ? "" : "ok");
+  }
+
+  function renderLog() {
+    var ul = $("#log");
+    ul.innerHTML = "";
+    if (!state.log.length) {
+      var li = document.createElement("li");
+      li.className = "empty-log";
+      li.textContent = "Nothing yet. Blocking and unblocking shows up here.";
+      ul.appendChild(li);
+      return;
+    }
+    state.log.slice(0, 25).forEach(function (e) {
+      var li = document.createElement("li");
+      var b = document.createElement("b");
+      b.textContent = e.action + ": ";
+      li.appendChild(b);
+      li.appendChild(document.createTextNode(e.detail));
+      var t = document.createElement("span");
+      t.className = "t";
+      t.textContent = " \u00B7 " + timeAgo(e.t);
+      li.appendChild(t);
+      ul.appendChild(li);
+    });
+  }
+
+  function updateRandWarn() {
+    var active = state.users.filter(function (u) { return !u.blocked; }).length;
+    var n = parseInt($("#randCount").value, 10);
+    if (!isFinite(n) || n < 1) n = 1;
+    var eff = Math.min(n, active);
+    $("#randWarn").innerHTML = "";
+    var strong = document.createElement("b");
+    strong.textContent = "\u26A0 Bulk action. ";
+    $("#randWarn").appendChild(strong);
+    $("#randWarn").appendChild(document.createTextNode(
+      "Blocks " + eff + " random account" + (eff === 1 ? "" : "s") + " out of " + active + " currently active. " +
+      "You will be asked to confirm, and Undo only reverses the last step."
+    ));
+    $("#randBtn").disabled = active === 0;
+  }
+
+  function render() {
+    renderStats();
+    renderList();
+    renderLog();
+    updateBulk();
+    updateRandWarn();
+    $("#undoBtn").disabled = state.history.length === 0;
+  }
+
+  function openConfirm(title, body, onOk) {
+    $("#cfTitle").textContent = title;
+    $("#cfBody").innerHTML = body;
+    var dlg = $("#confirmDlg");
+    var ok = $("#cfOk"), cancel = $("#cfCancel");
+    function cleanup() { ok.onclick = null; cancel.onclick = null; }
+    ok.onclick = function () { cleanup(); dlg.close(); onOk(); };
+    cancel.onclick = function () { cleanup(); dlg.close(); };
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+  }
+
+  function randomBlock() {
+    var n = parseInt($("#randCount").value, 10);
+    var pool = state.users.filter(function (u) { return !u.blocked; });
+    if (!isFinite(n) || n < 1) { toast("Enter how many accounts to block.", "err"); return; }
+    if (!pool.length) { toast("Every account is already blocked.", "err"); return; }
+    var eff = Math.min(n, pool.length);
+    var shuffled = pool.slice(), i, j, t;
+    for (i = shuffled.length - 1; i > 0; i--) {
+      j = Math.floor(rng() * (i + 1));
+      t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t;
+    }
+    var picks = shuffled.slice(0, eff);
+    openConfirm(
+      "Block " + eff + " account" + (eff === 1 ? "" : "s") + " at random?",
+      "This immediately blocks <b>" + eff + "</b> randomly chosen account" + (eff === 1 ? "" : "s") +
+      " from the <b>" + pool.length + "</b> currently active. Blocking hides their content from you. " +
+      "Undo reverses this step; individual accounts can be unblocked afterwards.",
+      function () {
+        pushHistory("Random block x" + eff);
+        var labels = [];
+        picks.forEach(function (u) { u.blocked = true; labels.push(u.handle); });
+        addLog("Random block", eff + " accounts: " + labels.slice(0, 3).join(", ") + (labels.length > 3 ? " +" + (labels.length - 3) + " more" : ""));
+        save(); render();
+        toast("Blocked " + eff + " random account" + (eff === 1 ? "" : "s"), "ok");
+      }
+    );
+  }
+
+  function undo() {
+    var last = state.history.pop();
+    if (!last) { toast("Nothing to undo.", "err"); return; }
+    state.users.forEach(function (u, i) { if (last.blocked[i] !== undefined) u.blocked = last.blocked[i]; });
+    addLog("Undo", last.label);
+    save(); render();
+    toast("Undid: " + last.label, "ok");
+  }
+
+  function resetSeed() {
+    openConfirm("Reset the directory?",
+      "This replaces the current account list with a freshly generated one and clears blocked state. This cannot be undone.",
+      function () {
+        state.users = seedUsers();
+        state.log = [];
+        state.history = [];
+        state.selection = {};
+        save(); render();
+        toast("Directory re-seeded", "ok");
+      });
+  }
+
+  function wire() {
+    $("#search").addEventListener("input", function () { renderList(); updateBulk(); });
+    $("#onlyBlocked").addEventListener("change", function () { renderList(); updateBulk(); });
+    $("#selectAll").addEventListener("change", function () {
+      var on = this.checked;
+      visible().forEach(function (u) { if (on) state.selection[u.id] = true; else delete state.selection[u.id]; });
+      renderList(); updateBulk();
+    });
+    $("#blockSel").onclick = function () { bulkSet(true); };
+    $("#unblockSel").onclick = function () { bulkSet(false); };
+    $("#clearSel").onclick = function () { state.selection = {}; renderList(); updateBulk(); };
+    $("#undoBtn").onclick = undo;
+    $("#resetBtn").onclick = resetSeed;
+    $("#randBtn").onclick = randomBlock;
+    $("#randCount").addEventListener("input", updateRandWarn);
+
+    var quick = $("#quickCounts");
+    [1, 5, 10, 25].forEach(function (n) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn ghost sm";
+      b.textContent = n;
+      b.onclick = function () { $("#randCount").value = n; updateRandWarn(); };
+      quick.appendChild(b);
+    });
+    var all = document.createElement("button");
+    all.type = "button";
+    all.className = "btn ghost sm";
+    all.textContent = "All active";
+    all.onclick = function () {
+      $("#randCount").value = state.users.filter(function (u) { return !u.blocked; }).length;
+      updateRandWarn();
+    };
+    quick.appendChild(all);
+  }
+
+  function init() {
+    if (!load()) {
+      state.users = seedUsers();
+      state.seed = Date.now();
+      save();
+    }
+    wire();
+    render();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+</body>
+</html>
