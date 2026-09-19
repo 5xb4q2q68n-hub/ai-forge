@@ -76,6 +76,8 @@ input[type="text"], input[type="number"], input[type="search"] {
 input:focus { outline: none; border-color: #5b6cff; box-shadow: 0 0 0 3px rgba(92, 108, 255, .18); }
 #search { flex: 1; min-width: 160px; }
 .toggle { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: #cbd5e6; cursor: pointer; user-select: none; }
+.chk-row { margin-top: 10px; }
+.chk-row .hint { color: #6b7793; font-size: 11.5px; }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: #7c5cff; cursor: pointer; }
 
 .bulk {
@@ -201,9 +203,13 @@ dialog::backdrop { background: rgba(4, 6, 10, .76); }
       <h2>Random block</h2>
       <p class="hint">Picks accounts at random from the currently unblocked set.</p>
       <div class="row2">
-        <input id="randCount" type="number" min="1" step="1" value="5" aria-label="How many accounts to block">
-        <button id="randBtn" class="btn danger" type="button">Block at random</button>
+        <input id="randCount" type="number" min="1" step="1" value="5" aria-label="How many accounts to block at random">
+        <button id="randBtn" class="btn danger" type="button">Block random</button>
       </div>
+      <label class="toggle chk-row" title="Keep already-blocked accounts out of the random draw">
+        <input type="checkbox" id="hideBlocked" checked> Hide blocked
+        <span class="hint">never pick an account that is already blocked</span>
+      </label>
       <div class="quick" id="quickCounts"></div>
       <div class="warn" id="randWarn"></div>
     </section>
@@ -507,20 +513,32 @@ dialog::backdrop { background: rgba(4, 6, 10, .76); }
     });
   }
 
+  function randPool() {
+    var hide = $("#hideBlocked").checked;
+    return state.users.filter(function (u) { return hide ? !u.blocked : true; });
+  }
+
   function updateRandWarn() {
+    var pool = randPool();
     var active = state.users.filter(function (u) { return !u.blocked; }).length;
+    var blockedN = state.users.length - active;
+    var hide = $("#hideBlocked").checked;
     var n = parseInt($("#randCount").value, 10);
     if (!isFinite(n) || n < 1) n = 1;
-    var eff = Math.min(n, active);
-    $("#randWarn").innerHTML = "";
+    var eff = Math.min(n, pool.length);
+    var w = $("#randWarn");
+    w.innerHTML = "";
     var strong = document.createElement("b");
     strong.textContent = "\u26A0 Bulk action. ";
-    $("#randWarn").appendChild(strong);
-    $("#randWarn").appendChild(document.createTextNode(
-      "Blocks " + eff + " random account" + (eff === 1 ? "" : "s") + " out of " + active + " currently active. " +
+    w.appendChild(strong);
+    w.appendChild(document.createTextNode(
+      "Blocks " + eff + " random account" + (eff === 1 ? "" : "s") + " out of " + pool.length + " eligible. " +
+      (hide
+        ? "Hide blocked is on, so the " + blockedN + " already-blocked account" + (blockedN === 1 ? "" : "s") + " cannot be picked. "
+        : "Hide blocked is off, so already-blocked accounts can be picked again. ") +
       "You will be asked to confirm, and Undo only reverses the last step."
     ));
-    $("#randBtn").disabled = active === 0;
+    $("#randBtn").disabled = pool.length === 0;
   }
 
   function render() {
@@ -545,9 +563,9 @@ dialog::backdrop { background: rgba(4, 6, 10, .76); }
 
   function randomBlock() {
     var n = parseInt($("#randCount").value, 10);
-    var pool = state.users.filter(function (u) { return !u.blocked; });
+    var pool = randPool();
     if (!isFinite(n) || n < 1) { toast("Enter how many accounts to block.", "err"); return; }
-    if (!pool.length) { toast("Every account is already blocked.", "err"); return; }
+    if (!pool.length) { toast("No eligible accounts left to pick from.", "err"); return; }
     var eff = Math.min(n, pool.length);
     var shuffled = pool.slice(), i, j, t;
     for (i = shuffled.length - 1; i > 0; i--) {
@@ -608,6 +626,7 @@ dialog::backdrop { background: rgba(4, 6, 10, .76); }
     $("#resetBtn").onclick = resetSeed;
     $("#randBtn").onclick = randomBlock;
     $("#randCount").addEventListener("input", updateRandWarn);
+    $("#hideBlocked").addEventListener("change", updateRandWarn);
 
     var quick = $("#quickCounts");
     [1, 5, 10, 25].forEach(function (n) {
